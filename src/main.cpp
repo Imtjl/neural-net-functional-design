@@ -1,5 +1,7 @@
 #include "data.hpp"
+#include "net.hpp"
 
+#include <cstdio>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -17,6 +19,28 @@ static void printSummary(const std::string &path,
     std::cout << "noise " << count[N_CLASSES] << ")\n";
 }
 
+// Trains one network and shows its answer on every test image.
+static void runDemo(const std::vector<Sample> &train,
+                    const std::vector<Sample> &test) {
+    Network net({IMG_PIXELS, 8, N_CLASSES}, 1);
+    TrainResult r = net.train(train, 0.3, 0.1, 10000);
+    std::cout << "structure 49-8-3, converged: "
+              << (r.converged ? "yes" : "no") << ", epochs: " << r.epochs
+              << "\n\n";
+
+    int correct = 0;
+    for (const Sample &s : test) {
+        const std::vector<double> &out = net.forward(s.pixels);
+        std::printf("%.2f %.2f %.2f  ", out[0], out[1], out[2]);
+        int predicted = net.classify(s.pixels);
+        bool ok = predicted == s.label;
+        correct += ok;
+        std::cout << (ok ? "OK    " : "FAIL  ") << s.name << " -> "
+                  << labelName(predicted) << "\n";
+    }
+    std::cout << "\ntest: " << correct << "/" << test.size() << " correct\n";
+}
+
 int main(int argc, char **argv) {
     std::string mode = argc > 1 ? argv[1] : "demo";
 
@@ -27,7 +51,7 @@ int main(int argc, char **argv) {
         printSummary("data/test.txt", test);
 
         if (mode == "demo") {
-            std::cout << "mode: demo (stub)\n";
+            runDemo(train, test);
         } else if (mode == "compare") {
             std::cout << "mode: compare (stub)\n";
         } else {

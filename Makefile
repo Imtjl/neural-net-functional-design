@@ -5,7 +5,7 @@ SRC := $(wildcard src/*.cpp)
 OBJ := $(SRC:src/%.cpp=build/%.o)
 BIN := build/nn
 
-.PHONY: all run compare alpha clean
+.PHONY: all run compare alpha figures clean
 
 all: $(BIN)
 
@@ -26,6 +26,9 @@ compare: $(BIN)
 
 alpha: $(BIN)
 	./$(BIN) alpha $(S)
+
+figures: $(BIN)
+	python3 tools/report_figures.py
 
 clean:
 	rm -rf build

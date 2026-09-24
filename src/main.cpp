@@ -131,6 +131,52 @@ static void runDemo(const std::vector<Sample> &train,
               << " correct\n";
 }
 
+// Averages over SEEDS trainings of one structure with one alpha.
+struct RunStats {
+    int converged = 0;
+    double epochs = 0, trainMs = 0, trainOk = 0, testOk = 0;
+    int testMin = 1 << 30, testMax = 0;
+};
+
+static RunStats evaluate(const std::vector<int> &sizes, double alpha,
+                         double eps, const std::vector<Sample> &train,
+                         const std::vector<Sample> &test) {
+    RunStats st;
+    for (int seed = 1; seed <= SEEDS; ++seed) {
+        Network net(sizes, seed);
+        auto t0 = Clock::now();
+        TrainResult r = net.train(train, alpha, eps, MAX_EPOCHS);
+        st.trainMs +=
+            std::chrono::duration<double, std::milli>(Clock::now() - t0)
+                .count();
+        st.converged += r.converged;
+        st.epochs += r.epochs;
+        st.trainOk += countCorrect(net, train);
+        int t = countCorrect(net, test);
+        st.testOk += t;
+        st.testMin = std::min(st.testMin, t);
+        st.testMax = std::max(st.testMax, t);
+    }
+    st.epochs /= SEEDS;
+    st.trainMs /= SEEDS;
+    st.trainOk /= SEEDS;
+    st.testOk /= SEEDS;
+    return st;
+}
+
+static void printHeader(const char *firstColumn) {
+    std::printf("%-12s %7s %9s %8s %9s %9s %10s\n", firstColumn, "weights",
+                "converged", "epochs", "train_ms", "train_ok", "test_ok");
+}
+
+static void printRow(const std::string &label, int weights,
+                     const RunStats &st, size_t trainSize, size_t testSize) {
+    std::printf("%-12s %7d %6d/%-2d %8.1f %9.2f %6.1f/%-2zu %4.1f/%zu (%d..%d)\n",
+                label.c_str(), weights, st.converged, SEEDS, st.epochs,
+                st.trainMs, st.trainOk, trainSize, st.testOk, testSize,
+                st.testMin, st.testMax);
+}
+
 // Trains every structure with SEEDS different initial weights and prints
 // averages. The best structure is the one with the highest mean test
 // accuracy (generalization); on a tie the one with fewer weights wins.
@@ -143,42 +189,40 @@ static void runCompare(const std::vector<Sample> &train,
 
     std::cout << "alpha " << ALPHA << ", eps " << eps << ", " << SEEDS
               << " seeds per structure\n\n";
-    std::printf("%-12s %7s %9s %8s %9s %9s %10s\n", "structure", "weights",
-                "converged", "epochs", "train_ms", "train_ok", "test_ok");
+    printHeader("structure");
 
     std::vector<int> best;
     double bestTest = -1.0;
     for (const auto &sizes : structures) {
-        int converged = 0, epochs = 0, trainOk = 0, testOk = 0;
-        int testMin = (int)test.size(), testMax = 0;
-        double ms = 0.0;
-        for (int seed = 1; seed <= SEEDS; ++seed) {
-            Network net(sizes, seed);
-            auto t0 = Clock::now();
-            TrainResult r = net.train(train, ALPHA, eps, MAX_EPOCHS);
-            ms += std::chrono::duration<double, std::milli>(Clock::now() - t0)
-                      .count();
-            converged += r.converged;
-            epochs += r.epochs;
-            trainOk += countCorrect(net, train);
-            int t = countCorrect(net, test);
-            testOk += t;
-            testMin = std::min(testMin, t);
-            testMax = std::max(testMax, t);
-        }
-        double meanTest = (double)testOk / SEEDS;
-        std::printf("%-12s %7d %6d/%-2d %8.1f %9.2f %6.1f/%-2zu %4.1f/%zu (%d..%d)\n",
-                    structureName(sizes).c_str(), weightCount(sizes),
-                    converged, SEEDS, (double)epochs / SEEDS, ms / SEEDS,
-                    (double)trainOk / SEEDS, train.size(), meanTest,
-                    test.size(), testMin, testMax);
-        if (meanTest > bestTest ||
-            (meanTest == bestTest && weightCount(sizes) < weightCount(best))) {
-            bestTest = meanTest;
+        RunStats st = evaluate(sizes, ALPHA, eps, train, test);
+        printRow(structureName(sizes), weightCount(sizes), st, train.size(),
+                 test.size());
+        if (st.testOk > bestTest ||
+            (st.testOk == bestTest && weightCount(sizes) < weightCount(best))) {
+            bestTest = st.testOk;
             best = sizes;
         }
     }
     std::cout << "\nbest: " << structureName(best) << "\n";
+}
+
+// The task says alpha is chosen empirically in 0..1 (0.1..0.3 recommended
+// against overfitting). Trains one structure with each alpha.
+static void runAlpha(const std::vector<Sample> &train,
+                     const std::vector<Sample> &test,
+                     const std::vector<int> &sizes) {
+    const std::vector<double> alphas = {0.01, 0.05, 0.1, 0.2,
+                                        0.3,  0.5,  0.8, 1.0};
+
+    std::cout << "structure " << structureName(sizes) << ", eps " << EPS
+              << ", " << SEEDS << " seeds per alpha\n\n";
+    printHeader("alpha");
+    for (double alpha : alphas) {
+        RunStats st = evaluate(sizes, alpha, EPS, train, test);
+        char label[16];
+        std::snprintf(label, sizeof label, "%.2f", alpha);
+        printRow(label, weightCount(sizes), st, train.size(), test.size());
+    }
 }
 
 int main(int argc, char **argv) {
@@ -194,11 +238,15 @@ int main(int argc, char **argv) {
         if (mode == "demo") {
             std::string structure = argc > 2 ? argv[2] : "49-8-3";
             runDemo(train, test, parseStructure(structure));
+        } else if (mode == "alpha") {
+            std::string structure = argc > 2 ? argv[2] : "49-8-3";
+            runAlpha(train, test, parseStructure(structure));
         } else if (mode == "compare") {
             double eps = argc > 2 ? std::stod(argv[2]) : EPS;
             runCompare(train, test, eps);
         } else {
-            std::cerr << "usage: nn demo [49-<hidden...>-3] | nn compare [eps]\n";
+            std::cerr << "usage: nn demo [49-<hidden...>-3] | nn compare [eps] | "
+                         "nn alpha [49-<hidden...>-3]\n";
             return 1;
         }
     } catch (const std::exception &e) {

@@ -5,7 +5,7 @@ SRC := $(wildcard src/*.cpp)
 OBJ := $(SRC:src/%.cpp=build/%.o)
 BIN := build/nn
 
-.PHONY: all run compare clean
+.PHONY: all run compare alpha clean
 
 all: $(BIN)
 
@@ -19,10 +19,13 @@ build:
 	mkdir -p build
 
 run: $(BIN)
-	./$(BIN) demo
+	./$(BIN) demo $(S)
 
 compare: $(BIN)
-	./$(BIN) compare
+	./$(BIN) compare $(E)
+
+alpha: $(BIN)
+	./$(BIN) alpha $(S)
 
 clean:
 	rm -rf build

@@ -120,15 +120,28 @@ static void runDemo(const std::vector<Sample> &train,
     printMemory(sizes, train.size());
     std::cout << "\n";
 
+    // Task item 4.4: images the network recognizes and images it fails on.
+    std::vector<const Sample *> ok, failed;
+    std::vector<std::string> okCaptions, failedCaptions;
     for (const Sample &s : test) {
         const std::vector<double> &out = net.forward(s.pixels);
         std::printf("%.2f %.2f %.2f  ", out[0], out[1], out[2]);
         int predicted = net.classify(s.pixels);
-        std::cout << (predicted == s.label ? "OK    " : "FAIL  ") << s.name
-                  << " -> " << labelName(predicted) << "\n";
+        bool correct = predicted == s.label;
+        std::cout << (correct ? "OK    " : "FAIL  ") << s.name << " -> "
+                  << labelName(predicted) << "\n";
+        (correct ? ok : failed).push_back(&s);
+        (correct ? okCaptions : failedCaptions)
+            .push_back("-> " + labelName(predicted));
     }
-    std::cout << "\ntest: " << countCorrect(net, test) << "/" << test.size()
+    std::cout << "\ntest: " << ok.size() << "/" << test.size()
               << " correct\n";
+
+    std::cout << "\n=== recognized (" << ok.size() << ") ===\n\n";
+    printGrid(ok, okCaptions);
+    std::cout << "=== failed (" << failed.size()
+              << "), caption = network answer ===\n\n";
+    printGrid(failed, failedCaptions);
 }
 
 // Averages over SEEDS trainings of one structure with one alpha.

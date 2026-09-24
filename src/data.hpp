@@ -16,4 +16,5 @@ struct Sample {
 
 std::vector<Sample> loadSamples(const std::string &path);
 std::string labelName(int label);
-void printSample(const Sample &s);
+void printGrid(const std::vector<const Sample *> &samples,
+               const std::vector<std::string> &captions);

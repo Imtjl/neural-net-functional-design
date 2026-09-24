@@ -4,6 +4,7 @@
 #include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <algorithm>
 
 static const char *CLASS_NAMES[N_CLASSES] = {"circle", "square", "triangle"};
 
@@ -70,11 +71,30 @@ std::vector<Sample> loadSamples(const std::string &path) {
     return samples;
 }
 
-void printSample(const Sample &s) {
-    std::cout << s.name << "\n";
-    for (int r = 0; r < IMG_SIDE; ++r) {
-        for (int c = 0; c < IMG_SIDE; ++c)
-            std::cout << (s.pixels[r * IMG_SIDE + c] > 0.5 ? '#' : '.');
+void printGrid(const std::vector<const Sample *> &samples,
+               const std::vector<std::string> &captions) {
+    const int PER_ROW = 4, WIDTH = 23;
+    for (size_t first = 0; first < samples.size(); first += PER_ROW) {
+        size_t last = std::min(samples.size(), first + PER_ROW);
+        auto cell = [&](const std::string &text) { // left-aligned column
+            std::string t = text.substr(0, WIDTH - 1);
+            std::cout << t << std::string(WIDTH - t.size(), ' ');
+        };
+        for (size_t i = first; i < last; ++i)
+            cell(samples[i]->name);
+        std::cout << "\n";
+        for (size_t i = first; i < last; ++i)
+            cell(captions[i]);
+        std::cout << "\n";
+        for (int r = 0; r < IMG_SIDE; ++r) {
+            for (size_t i = first; i < last; ++i) {
+                std::string row;
+                for (int c = 0; c < IMG_SIDE; ++c)
+                    row += samples[i]->pixels[r * IMG_SIDE + c] > 0.5 ? '#' : '.';
+                cell(row);
+            }
+            std::cout << "\n";
+        }
         std::cout << "\n";
     }
 }

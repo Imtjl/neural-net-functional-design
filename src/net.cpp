@@ -2,7 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <fstream>
+#include <iomanip>
 #include <random>
+#include <stdexcept>
 
 static double sigmoid(double x) { return 1.0 / (1.0 + std::exp(-x)); }
 
@@ -108,4 +111,20 @@ int Network::classify(const std::vector<double> &input) {
     const std::vector<double> &out = forward(input);
     int best = (int)(std::max_element(out.begin(), out.end()) - out.begin());
     return out[best] < REJECT_THRESHOLD ? NOISE : best;
+}
+
+void Network::save(const std::string &path, const std::string &comment) const {
+    std::ofstream out(path);
+    if (!out)
+        throw std::runtime_error("cannot write " + path);
+    out << "# " << comment << "\nshape";
+    for (int v : n)
+        out << " " << v;
+    out << "\n" << std::setprecision(17);
+    for (size_t k = 1; k < n.size(); ++k)
+        for (const auto &row : w[k]) {
+            for (size_t j = 0; j < row.size(); ++j)
+                out << (j ? " " : "") << row[j];
+            out << "\n";
+        }
 }

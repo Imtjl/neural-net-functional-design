@@ -144,6 +144,17 @@ static void runDemo(const std::vector<Sample> &train,
     printGrid(failed, failedCaptions);
 }
 
+// Trains one network with seed 1 and writes its weights for the NPU model.
+static void runExport(const std::vector<Sample> &train,
+                      const std::vector<int> &sizes, const std::string &path) {
+    Network net(sizes, 1);
+    TrainResult r = net.train(train, ALPHA, EPS, MAX_EPOCHS);
+    net.save(path, structureName(sizes) + " trained by neural-net-functional-design (nn export), seed 1, " +
+                       std::to_string(r.epochs) + " epochs, converged " + (r.converged ? "yes" : "no"));
+    std::printf("structure %s: %d epochs, converged %s -> %s\n", structureName(sizes).c_str(), r.epochs,
+                r.converged ? "yes" : "no", path.c_str());
+}
+
 // Averages over SEEDS trainings of one structure with one alpha.
 struct RunStats {
     int converged = 0;
@@ -254,12 +265,16 @@ int main(int argc, char **argv) {
         } else if (mode == "alpha") {
             std::string structure = argc > 2 ? argv[2] : "49-8-3";
             runAlpha(train, test, parseStructure(structure));
+        } else if (mode == "export") {
+            std::string structure = argc > 2 ? argv[2] : "49-8-3";
+            std::string path = argc > 3 ? argv[3] : "build/" + structure + ".txt";
+            runExport(train, parseStructure(structure), path);
         } else if (mode == "compare") {
             double eps = argc > 2 ? std::stod(argv[2]) : EPS;
             runCompare(train, test, eps);
         } else {
             std::cerr << "usage: nn demo [49-<hidden...>-3] | nn compare [eps] | "
-                         "nn alpha [49-<hidden...>-3]\n";
+                         "nn alpha [49-<hidden...>-3] | nn export [49-<hidden...>-3] [path]\n";
             return 1;
         }
     } catch (const std::exception &e) {

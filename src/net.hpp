@@ -24,6 +24,8 @@ class Network {
     TrainResult train(const std::vector<Sample> &set, double alpha,
                       double eps, int maxEpochs);
     int classify(const std::vector<double> &input); // class index or NOISE
+    // Weights file for the NPU model (lab 3): "shape 49 8 3", then w[k][i][j].
+    void save(const std::string &path, const std::string &comment) const;
 
   private:
     std::vector<int> n;                            // n[k]: neurons in layer k
